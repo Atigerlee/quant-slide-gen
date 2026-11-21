@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>現代量化研究演化前沿：從回測偏差防禦到自演化智能體 Alpha 挖掘</title>
+<style>
+  :root {
+    --bg-primary: #090d16;
+    --bg-secondary: #0f172a;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #10b981;
+    --accent-red: #ef4444;
+    --accent-gold: #f59e0b;
+    --accent-purple: #a855f7;
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'Consolas', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+  }
+
+  /* 16:9 Presentation Viewport Container */
+  .deck-container {
+    position: relative;
+    width: 96vw;
+    height: 54vw;
+    max-width: 1600px;
+    max-height: 900px;
+    background: radial-gradient(circle at 50% 20%, #172554 0%, #090d16 80%);
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .slide {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    padding: 42px 64px 48px 64px;
+    animation: fadeIn 0.35s ease-in-out;
+  }
+
+  .slide.active {
+    display: flex;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Slide Header */
+  .slide-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+    padding-bottom: 12px;
+  }
+
+  .slide-tag {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.12);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+
+  .slide-title {
+    font-size: 2.05rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffffff 60%, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .slide-subtitle {
+    font-size: 0.98rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Slide Body & Layouts */
+  .slide-body {
+    flex: 1;
+    display: grid;
+    gap: 26px;
+    align-items: center;
+  }
+
+  .layout-split {
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+
+  .layout-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .layout-grid-2x3 {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  /* Content Cards & Lists */
+  .bullet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    list-style: none;
+  }
+
+  .bullet-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 1.12rem;
+    line-height: 1.5;
+    color: #e2e8f0;
+  }
+
+  .bullet-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-blue);
+    border-radius: 50%;
+    margin-top: 8px;
+    box-shadow: 0 0 10px var(--accent-blue);
+    flex-shrink: 0;
+  }
+
+  .bullet-item strong {
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  /* Card Components */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  }
+
+  .card-highlight {
+    border-color: rgba(56, 189, 248, 0.4);
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+  }
+
+  .card-danger {
+    border-color: rgba(239, 68, 68, 0.35);
+    background: linear-gradient(145deg, rgba(239, 68, 68, 0.08), #1e293b);
+  }
+
+  .card-success {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.08), #1e293b);
+  }
+
+  .card-title {
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-desc {
+    font-size: 0.92rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+  }
+
+  /* Math Card */
+  .math-card {
+    background: #0b1120;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    box-shadow: inset 0 0 20px rgba(56, 189, 248, 0.05);
+  }
+
+  .math-label {
+    font-size: 0.78rem;
+    color: var(--accent-blue);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  /* Native MathML styling */
+  math {
+    font-family: 'Cambria Math', 'Latin Modern Math', 'STIX Two Math', 'Times New Roman', serif;
+    font-size: 1.3rem;
+    color: #f1f5f9;
+  }
+
+  /* Footer Controls & Progress */
+  .slide-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid rgba(51, 65, 85, 0.4);
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .citation-tag {
+    color: #64748b;
+    font-family: var(--font-mono);
+  }
+
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .page-number {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent-blue);
+  }
+
+  .progress-bar-bg {
+    width: 140px;
+    height: 4px;
+    background: #1e293b;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+    width: 10%;
+    transition: width 0.25s ease;
+  }
+
+  .key-hint {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.72rem;
+    color: #475569;
+    letter-spacing: 0.05em;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  .stat-box {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--accent-green);
+    font-family: var(--font-mono);
+  }
+
+  .stat-name {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="deck-container" id="deckContainer">
+
+  <!-- SLIDE 1: Title Cover -->
+  <div class="slide active" data-slide="1">
+    <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 18px;">
+      <div class="slide-tag">State-of-the-Art Quant Presentation</div>
+      <h1 style="font-size: 2.6rem; font-weight: 900; line-height: 1.25; max-width: 1000px; background: linear-gradient(135deg, #ffffff 40%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        現代量化研究演化前沿：<br>從回測偏差防禦到自演化智能體挖掘
+      </h1>
+      <p style="font-size: 1.15rem; color: #94a3b8; max-width: 820px;">
+        PBO / DSR 統計檢驗、協同算子代數至 Agentic RL 自主閉環
+      </p>
+      <div style="display: flex; gap: 12px; margin-top: 6px;">
+        <span class="slide-tag" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-green);">PBO & DSR 檢定</span>
+        <span class="slide-tag" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); color: var(--accent-gold);">AlphaGen 協同</span>
+        <span class="slide-tag" style="background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.3); color: var(--accent-blue);">R&D-Agent(Q)</span>
+        <span class="slide-tag" style="background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.3); color: var(--accent-purple);">AlphaAgentEvo ARL</span>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/index.md]]</span>
+      <div class="progress-wrap"><span class="page-number">01 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: Core Dilemma -->
+  <div class="slide" data-slide="2">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">現代量化之痛：Alpha 衰減與贏家的詛咒</div>
+        <div class="slide-subtitle">算力過剩引發的假陽性危機與市場套利侵蝕</div>
+      </div>
+      <div class="slide-tag">Problem Formulation</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>多重測試陷阱</strong>：算力窮舉歷史噪聲，高夏普多為假陽性。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>因子擁擠衰減</strong>：同質化策略推升進場成本，平倉引發踩踏。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>贏家的詛咒</strong>：海量策略中勝出者，實質承擔最嚴重均值回歸。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">因子衰減數學表徵</div>
+        <math display="block">
+          <mfrac>
+            <mrow><mo>&#x2202;</mo><mi mathvariant="double-struck">E</mi><mo>[</mo><msub><mtext>RankIC</mtext><mi>t</mi></msub><mo>]</mo></mrow>
+            <mrow><mo>&#x2202;</mo><mi>t</mi></mrow>
+          </mfrac>
+          <mo>&lt;</mo>
+          <mn>0</mn>
+        </math>
+        <p style="font-size: 0.85rem; color: #94a3b8; text-align: center; margin-top: 6px;">
+          資訊係數隨時間推移持續萎縮
+        </p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/concepts/alpha-decay]], [[wiki/papers/bailey-prado-2014-deflated-sharpe]]</span>
+      <div class="progress-wrap"><span class="page-number">02 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: PBO & CSCV -->
+  <div class="slide" data-slide="3">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">統計防禦線一：回測過度擬合機率 (PBO)</div>
+        <div class="slide-subtitle">基於測度論的非參數化策略篩選檢驗框架</div>
+      </div>
+      <div class="slide-tag">Mathematical Theory</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>破解留出法</strong>：多重嘗試下，單一 Hold-out 必然失效。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>過度擬合定義</strong>：樣本內最優者，樣本外期望排名落入中位數以下。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>CSCV 對稱切分</strong>：等分 <math><mi>S</mi></math> 塊對稱配對，映射至 Logit 空間積分。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">PBO 數值積分與 Logit 映射</div>
+        <math display="block">
+          <mtext>PBO</mtext>
+          <mo>=</mo>
+          <msubsup>
+            <mo>&#x222B;</mo>
+            <mrow><mo>-</mo><mo>&#x221E;</mo></mrow>
+            <mn>0</mn>
+          </msubsup>
+          <mi>f</mi>
+          <mo>(</mo><mi>&#x03BB;</mi><mo>)</mo>
+          <mspace width="0.167em"/>
+          <mi>d</mi><mi>&#x03BB;</mi>
+          <mo>,</mo>
+          <mspace width="0.5em"/>
+          <msub><mi>&#x03BB;</mi><mi>c</mi></msub>
+          <mo>=</mo>
+          <mi>ln</mi>
+          <mo>(</mo>
+          <mfrac>
+            <msub><mover><mi>&#x03C9;</mi><mo>&#xAF;</mo></mover><mi>c</mi></msub>
+            <mrow><mn>1</mn><mo>-</mo><msub><mover><mi>&#x03C9;</mi><mo>&#xAF;</mo></mover><mi>c</mi></msub></mrow>
+          </mfrac>
+          <mo>)</mo>
+        </math>
+        <p style="font-size: 0.85rem; color: #94a3b8; text-align: center; margin-top: 6px;">
+          實務警戒：<math><mtext>PBO</mtext><mo>&gt;</mo><mn>0.05</mn></math> 即應拒絕策略
+        </p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/papers/bailey-prado-2015-pbo]], [[wiki/concepts/probability-of-backtest-overfitting]]</span>
+      <div class="progress-wrap"><span class="page-number">03 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: Deflated Sharpe Ratio (DSR) -->
+  <div class="slide" data-slide="4">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">統計防禦線二：通縮夏普比率 (DSR)</div>
+        <div class="slide-subtitle">矯正選擇偏差、非高斯偏態與試驗次數膨脹</div>
+      </div>
+      <div class="slide-tag">Statistical Rigor</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>極值膨脹校正</strong>：最大夏普隨試驗數 <math><mi>N</mi></math> 呈對數邊際虛增。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>DSR 顯著性檢定</strong>：納入樣本長度與偏態峰態修正選擇偏差。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>1/e 最優停止法則</strong>：評估前 37% 策略確立基準，超越者即停。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">通縮夏普比率公式 (DSR)</div>
+        <math display="block">
+          <mtext>DSR</mtext>
+          <mo>=</mo>
+          <mi>Z</mi>
+          <mo>[</mo>
+          <mfrac>
+            <mrow>
+              <mo>(</mo><mover><mtext>SR</mtext><mo>^</mo></mover><mo>-</mo><msub><mover><mtext>SR</mtext><mo>^</mo></mover><mn>0</mn></msub><mo>)</mo>
+              <msqrt><mrow><mi>T</mi><mo>-</mo><mn>1</mn></mrow></msqrt>
+            </mrow>
+            <msqrt>
+              <mrow>
+                <mn>1</mn>
+                <mo>-</mo>
+                <msub><mover><mi>&#x03B3;</mi><mo>^</mo></mover><mn>3</mn></msub><mover><mtext>SR</mtext><mo>^</mo></mover>
+                <mo>+</mo>
+                <mfrac>
+                  <mrow><msub><mover><mi>&#x03B3;</mi><mo>^</mo></mover><mn>4</mn></msub><mo>-</mo><mn>1</mn></mrow>
+                  <mn>4</mn>
+                </mfrac>
+                <msup><mover><mtext>SR</mtext><mo>^</mo></mover><mn>2</mn></msup>
+              </mrow>
+            </msqrt>
+          </mfrac>
+          <mo>]</mo>
+        </math>
+        <p style="font-size: 0.85rem; color: #94a3b8; text-align: center; margin-top: 6px;">
+          若 <math><mtext>DSR</mtext><mo>&lt;</mo><mn>0.95</mn></math>，高夏普仍不可信
+        </p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/papers/bailey-prado-2014-deflated-sharpe]]</span>
+      <div class="progress-wrap"><span class="page-number">04 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: Six Deadly Pitfalls -->
+  <div class="slide" data-slide="5">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">量化回測的六大致命陷阱</div>
+        <div class="slide-subtitle">策略從歷史模擬跨入實盤虧損的六大常見漏洞</div>
+      </div>
+      <div class="slide-tag">Risk Audit</div>
+    </div>
+    <div class="slide-body layout-grid-2x3">
+      <div class="card card-danger">
+        <div class="card-title" style="color: var(--accent-red);">1. 前視偏差</div>
+        <div class="card-desc">Delay-0 成交妄想；未平移除權息。</div>
+      </div>
+      <div class="card card-danger">
+        <div class="card-title" style="color: var(--accent-red);">2. 存活者偏差</div>
+        <div class="card-desc">排除退市標的，虛增年化收益。</div>
+      </div>
+      <div class="card card-danger">
+        <div class="card-title" style="color: var(--accent-red);">3. 資料探勘</div>
+        <div class="card-desc">過度調參；隱瞞失敗嘗試次數。</div>
+      </div>
+      <div class="card card-danger">
+        <div class="card-title" style="color: var(--accent-red);">4. 滑價低估</div>
+        <div class="card-desc">忽略非線性市場衝擊成本。</div>
+      </div>
+      <div class="card card-danger">
+        <div class="card-title" style="color: var(--accent-red);">5. 容量瓶頸</div>
+        <div class="card-desc">持倉逾 ADV 2% 引發踩踏。</div>
+      </div>
+      <div class="card card-danger">
+        <div class="card-title" style="color: var(--accent-red);">6. 體系轉換</div>
+        <div class="card-desc">極端行情下分散效應瓦解。</div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/strategies/alpha-portfolio-selection]], [[wiki/papers/kakushadze-2016-101-formulaic-alphas]]</span>
+      <div class="progress-wrap"><span class="page-number">05 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: Synergistic Mining (AlphaGen) -->
+  <div class="slide" data-slide="6">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">因子協同演化：從 101 到 AlphaGen</div>
+        <div class="slide-subtitle">突破單因子思維：以組合協同增益為優化導向</div>
+      </div>
+      <div class="slide-tag">Synergistic Mining</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>101 算子代數</strong>：實證確立 <math><mi>R</mi><mo>&#x223C;</mo><msup><mi>&#x03C3;</mi><mn>0.761</mn></msup></math>，換手率無解釋力。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>破除兩兩 IC 盲點</strong>：高相關因子線性組合可能產生正交超額收益。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>AlphaGen 協同強化學習</strong>：直接以組合 MSE 損失解析為 PPO 獎勵。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">組合 MSE 損失協同解析</div>
+        <math display="block">
+          <mi mathvariant="script">L</mi><mo>(</mo><mi mathvariant="bold">w</mi><mo>)</mo>
+          <mo>=</mo>
+          <mfrac><mn>1</mn><mi>n</mi></mfrac>
+          <mo>[</mo>
+          <mn>1</mn>
+          <mo>-</mo>
+          <mn>2</mn><munderover><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>k</mi></munderover><msub><mi>w</mi><mi>i</mi></msub><msub><mover><mi>&#x03C3;</mi><mo>&#xAF;</mo></mover><mi>y</mi></msub><mo>(</mo><msub><mi>f</mi><mi>i</mi></msub><mo>)</mo>
+          <mo>+</mo>
+          <munderover><mo>&#x2211;</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>k</mi></munderover>
+          <munderover><mo>&#x2211;</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>k</mi></munderover>
+          <msub><mi>w</mi><mi>i</mi></msub><msub><mi>w</mi><mi>j</mi></msub>
+          <mover><mi>&#x03C3;</mi><mo>&#xAF;</mo></mover><mo>(</mo><msub><mi>f</mi><mi>i</mi></msub><mo>,</mo><msub><mi>f</mi><mi>j</mi></msub><mo>)</mo>
+          <mo>]</mo>
+        </math>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/papers/kakushadze-2016-101-formulaic-alphas]], [[wiki/papers/yu-2023-alphagen-synergistic-rl]]</span>
+      <div class="progress-wrap"><span class="page-number">06 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: AlphaAgent AST -->
+  <div class="slide" data-slide="7">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">符號正則化：AlphaAgent AST 同構</div>
+        <div class="slide-subtitle">最大子樹同構防擁擠與假說語義一致性打分</div>
+      </div>
+      <div class="slide-tag">Regularization</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>AST 同構 (<math><mi mathvariant="script">S</mi><mo>(</mo><mi>f</mi><mo>)</mo></math>)</strong>：比對現有庫最大子樹尺寸，強迫結構創新防擁擠。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>假說對齊 (<math><mi mathvariant="script">C</mi></math>)</strong>：LLM 評估描述與公式一致性，剔除無因果偽信號。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>簡約約束</strong>：懲罰符號長度與調參數，嚴守奧坎剃刀原則。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">探索正則化目標函數</div>
+        <math display="block">
+          <msub><mi mathvariant="script">R</mi><mi>g</mi></msub><mo>(</mo><mi>f</mi><mo>,</mo><mi>h</mi><mo>)</mo>
+          <mo>=</mo>
+          <msub><mi>&#x03B1;</mi><mn>1</mn></msub><mtext>SL</mtext>
+          <mo>+</mo>
+          <msub><mi>&#x03B1;</mi><mn>2</mn></msub><mtext>PC</mtext>
+          <mo>+</mo>
+          <msub><mi>&#x03B1;</mi><mn>3</mn></msub><mtext>ER</mtext>
+        </math>
+        <math display="block">
+          <mtext>ER</mtext>
+          <mo>=</mo>
+          <msub><mi>&#x03B2;</mi><mn>1</mn></msub><mi mathvariant="script">S</mi><mo>(</mo><mi>f</mi><mo>)</mo>
+          <mo>+</mo>
+          <msub><mi>&#x03B2;</mi><mn>2</mn></msub><mi mathvariant="script">C</mi><mo>(</mo><mi>h</mi><mo>,</mo><mi>d</mi><mo>,</mo><mi>f</mi><mo>)</mo>
+          <mo>+</mo>
+          <msub><mi>&#x03B2;</mi><mn>3</mn></msub><mi>log</mi><mo>(</mo><mn>1</mn><mo>+</mo><mo>|</mo><msub><mi mathvariant="script">F</mi><mi>f</mi></msub><mo>|</mo><mo>)</mo>
+        </math>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/papers/tang-2025-alpha-agent]], [[wiki/concepts/alpha-decay]]</span>
+      <div class="progress-wrap"><span class="page-number">07 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: R&D-Agent(Q) -->
+  <div class="slide" data-slide="8">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">全棧協同研發：R&D-Agent(Q)</div>
+        <div class="slide-subtitle">因子與模型交替演化的貝氏多臂老虎機 (NeurIPS '25)</div>
+      </div>
+      <div class="slide-tag">Autonomous Research</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>五大單元閉環</strong>：規格隔離防洩漏、假說森林與 Co-STEER 代碼自修復。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>Thompson 老虎機調度</strong>：依 8 維績效向量動態平衡因子與模型優化。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>極致成本效益</strong>：低於 $10 成本，超額收益翻倍且因子減少 70%。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">上下文 Thompson 抽樣收益</div>
+        <math display="block">
+          <msup><mover><mi>r</mi><mo>^</mo></mover><mrow><mo>(</mo><mi>a</mi><mo>)</mo></mrow></msup>
+          <mo>=</mo>
+          <msup><mrow><mo>(</mo><msup><mover><mi mathvariant="bold">&#x03B8;</mi><mo>~</mo></mover><mrow><mo>(</mo><mi>a</mi><mo>)</mo></mrow></msup><mo>)</mo></mrow><mo>&#x22A4;</mo></msup>
+          <msub><mi mathvariant="bold">x</mi><mi>t</mi></msub>
+        </math>
+        <math display="block">
+          <msup><mover><mi mathvariant="bold">&#x03B8;</mi><mo>~</mo></mover><mrow><mo>(</mo><mi>a</mi><mo>)</mo></mrow></msup>
+          <mo>&#x223C;</mo>
+          <mi mathvariant="script">N</mi>
+          <mo>(</mo>
+          <msup><mi mathvariant="bold">&#x03BC;</mi><mrow><mo>(</mo><mi>a</mi><mo>)</mo></mrow></msup>
+          <mo>,</mo>
+          <msup><mrow><mo>(</mo><msup><mi mathvariant="bold">P</mi><mrow><mo>(</mo><mi>a</mi><mo>)</mo></mrow></msup><mo>)</mo></mrow><mrow><mo>-</mo><mn>1</mn></mrow></msup>
+          <mo>)</mo>
+        </math>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/papers/li-2025-rd-agent-quant]]</span>
+      <div class="progress-wrap"><span class="page-number">08 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: AlphaAgentEvo ARL -->
+  <div class="slide" data-slide="9">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">終極自演化範式：AlphaAgentEvo ARL</div>
+        <div class="slide-subtitle">基於智能體強化學習與 GRPO 的長軌跡演化 (ICLR '26)</div>
+      </div>
+      <div class="slide-tag">Frontier Paradigm</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>突破單步試錯</strong>：以 GRPO 策略在多輪工具反思軌跡中自我演化。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>階層式演化獎勵</strong>：結合調用成本、種子錨定、AST 探索與連續進步。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot"></div>
+          <div><strong>輕量模型超群表現</strong>：4B 參數模型在牛熊跨期 Pass@5 達 97%～99%。</div>
+        </li>
+      </ul>
+      <div class="math-card">
+        <div class="math-label">多層次階層獎勵函數</div>
+        <math display="block">
+          <mi>R</mi><mo>(</mo><mi>&#x03C4;</mi><mo>)</mo>
+          <mo>=</mo>
+          <mfrac>
+            <mrow><mi>min</mi><mo>(</mo><msub><mi>R</mi><mtext>cons</mtext></msub><mo>,</mo><mi>C</mi><mo>)</mo><mo>+</mo><mi>min</mi><mo>(</mo><msub><mi>R</mi><mtext>expl</mtext></msub><mo>,</mo><mi>C</mi><mo>)</mo></mrow>
+            <mrow><mi>min</mi><mo>(</mo><msub><mi>R</mi><mtext>tool</mtext></msub><mo>,</mo><mi>C</mi><mo>)</mo></mrow>
+          </mfrac>
+          <mo>+</mo>
+          <mi>min</mi><mo>(</mo><msub><mi>R</mi><mtext>perf</mtext></msub><mo>,</mo><mi>C</mi><mo>)</mo>
+          <mo>&#x22C5;</mo>
+          <mi>min</mi><mo>(</mo><msub><mi>R</mi><mtext>streak</mtext></msub><mo>,</mo><mi>C</mi><mo>)</mo>
+        </math>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/papers/tang-2026-alphaagentevo-arl]]</span>
+      <div class="progress-wrap"><span class="page-number">09 / 10</span></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: Conclusion & Best Practices -->
+  <div class="slide" data-slide="10">
+    <div class="slide-header">
+      <div>
+        <div class="slide-title">結語：防禦性量化研究最佳實踐</div>
+        <div class="slide-subtitle">打造兼具統計誠信、因果邏輯與實盤存活力的量化架構</div>
+      </div>
+      <div class="slide-tag">Actionable Rules</div>
+    </div>
+    <div class="slide-body layout-split">
+      <ul class="bullet-list">
+        <li class="bullet-item">
+          <div class="bullet-dot" style="background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green);"></div>
+          <div><strong>數據紀律</strong>：落實 Delay-1 與動態成分股，根除前視與存活者偏差。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot" style="background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green);"></div>
+          <div><strong>統計門檻</strong>：常態化 PBO 與 DSR 檢定，果斷拒絕脆弱策略。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot" style="background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green);"></div>
+          <div><strong>目標悖論</strong>：嚴禁將去膨脹統計量當成目標函數 (Strathern)。</div>
+        </li>
+        <li class="bullet-item">
+          <div class="bullet-dot" style="background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green);"></div>
+          <div><strong>自演化智能體</strong>：結合因果先驗與 Agentic RL，探索真 Alpha。</div>
+        </li>
+      </ul>
+      <div class="card card-success" style="text-align: center; padding: 22px;">
+        <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin-bottom: 8px;">
+          "When a measure becomes a target, it ceases to be a good measure."
+        </div>
+        <div style="font-size: 0.88rem; color: var(--accent-gold); font-style: italic;">
+          — Strathern's Maxim for Quantitative Finance
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span class="citation-tag">Source: [[wiki/strategies/alpha-portfolio-selection]], [[wiki/papers/bailey-prado-2015-pbo]], [[wiki/papers/tang-2026-alphaagentevo-arl]]</span>
+      <div class="progress-wrap"><span class="page-number">10 / 10</span></div>
+    </div>
+  </div>
+
+  <div class="key-hint">使用鍵盤 [ &#x2190; / &#x2192; ] 或 [ 空白鍵 ] 翻頁 | [ F ] 全螢幕切換 | 100% 離線可用</div>
+</div>
+
+<script>
+  (function() {
+    let currentSlide = 1;
+    const totalSlides = 10;
+    const slides = document.querySelectorAll('.slide');
+
+    slides.forEach((s) => {
+      const wrap = s.querySelector('.progress-wrap');
+      const barBg = document.createElement('div');
+      barBg.className = 'progress-bar-bg';
+      const fill = document.createElement('div');
+      fill.className = 'progress-bar-fill';
+      barBg.appendChild(fill);
+      wrap.insertBefore(barBg, wrap.firstChild);
+    });
+
+    function showSlide(index) {
+      if (index < 1) index = 1;
+      if (index > totalSlides) index = totalSlides;
+      currentSlide = index;
+
+      slides.forEach((s) => {
+        const idx = parseInt(s.getAttribute('data-slide'));
+        if (idx === currentSlide) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+        const fill = s.querySelector('.progress-bar-fill');
+        if (fill) {
+          fill.style.width = ((currentSlide / totalSlides) * 100) + '%';
+        }
+      });
+    }
+
+    // Keyboard navigation
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        showSlide(currentSlide + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        showSlide(currentSlide - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        showSlide(1);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        showSlide(totalSlides);
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+      }
+    });
+
+    // Touch / Click navigation support
+    document.getElementById('deckContainer').addEventListener('click', function(e) {
+      const rect = this.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      if (clickX > rect.width * 0.7) {
+        showSlide(currentSlide + 1);
+      } else if (clickX < rect.width * 0.3) {
+        showSlide(currentSlide - 1);
+      }
+    });
+
+    showSlide(1);
+  })();
+</script>
+
+</body>
+</html>
